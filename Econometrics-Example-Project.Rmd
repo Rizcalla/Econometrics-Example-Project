@@ -1,0 +1,395 @@
+---
+title: "Effect of exchange rate on Canadian economy (Import, Export, and Inflation)."
+author: 'Rizcalla@hotmail.com'
+date: '2022-07-04'
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+  pdf_document: default
+subtitle: Empirical Study
+always_allow_html: true
+---
+
+\pagebreak
+
+# 1. Summary
+
+One of the most important indicators of a country's economy health, behavior and evolution is its *GDP*, so understanding the different factors affecting it represents an important work that needs to be achieved to contribute to the planing of the future of the country. In the present work we want to assert the possible effects of the *Exchange rate* and other related indicators over the Canadian economy, using the *GDP* as a proxy of its state over the years. To do this we'll use a collection of indicators publicly available in The World Bank data bank from its members, and different analysis and visualization tools available in the CRAN project.
+
+Keywords: economy health, GDP, exchange rate, Canadian economy
+
+# 2. Objectives
+
+-   Obtain and clean publicly available data from The World Bank related to the Canadian Economy
+-   Establish patterns between some of the available indicators using data visualization tools
+-   Establish the possible relations between the chosen indicators and the Canadian GDP
+-   Elaborate a predictive model to assert the possible effects of the chosen indicators over the Canadian GDP
+-   Assess the robustness of the model
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(GGally)
+library(modelsummary)
+library(lmtest)
+library(sandwich)
+library(gt)
+library(readxl)
+library(kableExtra)
+library(jtools)
+```
+
+# 3. Introduction
+
+In their website, the International Monetary Fund states that "*GDP* measures the monetary value of final goods and services (...) in a country in a given period of time", and that "*GDP* is important because it gives information about the size of the economy and how an economy is performing" (Callen, 2020). Under these assumptions we can expect that the *Exports* and *Imports* of goods and services of a country have an effect over it's economy health and its *GDP*. In addition, the Bank of Canada in their website explain that the "Demand for our dollar is affected mainly by demand for Canadian goods and services---the more people want to buy what we sell, the more our Canadian dollar is worth" ("Understanding exchange rates", 2020), giving us a hint that the *Exchange rates* are related to the *Exports* and *Imports* of a country, which could mean that it may also have an effect over its *GDP* and the health of its economy. Under these assumptions we can analyze the data publicly available in the World Bank website, supplied to them by their members (including Canada), to check if there's a relation between these indicators and the Canadian Economy, or in this case, its *GDP*. \pagebreak
+
+# 4. Data Analysis
+
+With the Canadian *GDP* and *Official exchange rate* data available from the years 1960 through 2021 in The World Bank data bank, we can calculate the Canadian *GDP annual growth rate* and the *Exchange rate variation* which are better indicators of how their Economy evolved through these years than the actual *GDP* and *Official exchange rate* themselves. In the case of *Inflation*, we can use the inflation related to consumers prices as a proxy of the generalized inflation.
+
+## 4.1. Variables description:
+
+-   **Exports of goods and services (annual % growth)**: "Annual growth rate of exports of goods and services based on constant local currency. Aggregates are based on constant 2015 prices, expressed in U.S. dollars. Exports of goods and services represent the value of all goods and other market services provided to the rest of the world. They include the value of merchandise, freight, insurance, transport, travel, royalties, license fees, and other services, such as communication, construction, financial, information, business, personal, and government services. They exclude compensation of employees and investment income (formerly called factor services) and transfer payments" ("Exports of goods and services (annual % growth) - Canada \| Data", 2022).
+
+-   **Imports of goods and services (annual % growth)**: "Annual growth rate of imports of goods and services based on constant local currency. Aggregates are based on constant 2015 prices, expressed in U.S. dollars. Imports of goods and services represent the value of all goods and other market services received from the rest of the world. They include the value of merchandise, freight, insurance, transport, travel, royalties, license fees, and other services, such as communication, construction, financial, information, business, personal, and government services. They exclude compensation of employees and investment income (formerly called factor services) and transfer payments" ("Imports of goods and services (annual % growth) - Canada \| Data", 2022).
+
+-   **Official exchange rate (LCU per US\$, period average)**: "Official exchange rate refers to the exchange rate determined by national authorities or to the rate determined in the legally sanctioned exchange market. It is calculated as an annual average based on monthly averages (local currency units relative to the U.S. dollar)" ("Official exchange rate (LCU per US\$, period average) - Canada \| Data", 2022).
+
+-   **Inflation, consumer prices (annual %)**: "Inflation as measured by the consumer price index reflects the annual percentage change in the cost to the average consumer of acquiring a basket of goods and services that may be fixed or changed at specified intervals, such as yearly. The Laspeyres formula is generally used" ("Inflation, consumer prices (annual %) - Canada \| Data", 2022).
+
+-   **GDP (current US\$)**: "GDP at purchaser's prices is the sum of gross value added by all resident producers in the economy plus any product taxes and minus any subsidies not included in the value of the products. It is calculated without making deductions for depreciation of fabricated assets or for depletion and degradation of natural resources. Data are in current U.S. dollars. Dollar figures for GDP are converted from domestic currencies using single year official exchange rates. For a few countries where the official exchange rate does not reflect the rate effectively applied to actual foreign exchange transactions, an alternative conversion factor is used" ("GDP (current US\$) - Canada \| Data", 2022).
+
+## 4.2. Derived variables:
+
+-   **GDP (annual % growth)**: Calculated from *GDP (current US\$)* as the % difference between each year *GDP*.
+
+-   **Exchange rate variation (annual % from period average)**: Calculated from *Official exchange rate (LCU per US\$, period average)* as the % variation between each year of the *Official exchange rate*.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+data <- read_xls("API_CAN_DS2_en_excel_v2_4263411.xls",sheet = 1)
+
+df <- data %>% gather("Year","Value",5:66) %>% select(`Country Name`,`Indicator Name`,Year,Value) %>% spread(`Indicator Name`,Value)
+
+df <- df %>% select( 
+  Year, 
+  `Exports of goods and services (annual % growth)`, 
+  `Imports of goods and services (annual % growth)`,
+  `Official exchange rate (LCU per US$, period average)`,
+  `GDP (current US$)`, 
+  `Inflation, consumer prices (annual %)`
+  ) %>% 
+  mutate(Year = as.numeric(Year))
+
+df$`Exchange rate variation (annual % from period average)` <-(0)
+df$`GDP (annual % growth)` <- c(0)
+
+
+i <- length(df$`GDP (annual % growth)`)
+
+for(x in 2:i){
+  df[x,7] <- (((df[x,4]-df[x-1,4])/df[x-1,4])*100)
+  df[x,8] <- (((df[x,5]-df[x-1,5])/df[x-1,5])*100)
+}
+
+rm(i)
+rm(x)
+```
+
+\pagebreak
+
+# 5. Data exploration and visualization
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', out.width="100%"}
+t1 <- df %>% 
+  select(
+    `Exports of goods and services (annual % growth)`,
+    `Imports of goods and services (annual % growth)`,
+    `GDP (annual % growth)`,
+    `Inflation, consumer prices (annual %)`,
+    `Exchange rate variation (annual % from period average)`) %>%
+  gather("Indicator", "Value",1:5) %>%
+  filter(!is.na(Value)) %>% 
+  group_by(Indicator) %>%
+  summarise(
+    `Observations`= n(), 
+    mean = signif(mean(Value), digits = 3), 
+    `s.d.` = signif(sd(Value),digits = 3), 
+    `minimum` = signif(min(Value),digits = 3), 
+    `maximum` = signif(max(Value),digits = 3)) %>% 
+  gt() %>% 
+  tab_header(title = "Table 1: Summary statistics")
+
+t1
+```
+
+Source: Own computations based on data from The World Bank DataBank
+<br> </br>
+\hfill\break
+\hfill\break
+\hfill\break
+```{r, echo=FALSE, message=FALSE, warning=FALSE, out.height="40%"}
+df %>%
+  select(
+    Year, 
+    `Inflation, consumer prices (annual %)`, 
+    `GDP (annual % growth)`, 
+    `Exchange rate variation (annual % from period average)`) %>% 
+  gather("Indicator","Value",2:4) %>% 
+  ggplot(aes(x = Year, y = Value, color = Indicator))+
+  geom_line()+
+  scale_x_continuous(breaks = seq(1960,2021,5))+
+  labs(title = "Figure 1: Exchange Rate variation, Inflation and GDP growth (annual %)")+
+  scale_y_continuous(name = "Annual %", breaks = seq(-14,22,2))+
+  theme(legend.position = "bottom")+
+  guides(color = guide_legend(nrow = 2, byrow = T))
+```
+
+Source: Own computations based on data from The World Bank DataBank
+<br> </br>
+\hfill\break
+\hfill\break
+\hfill\break
+We can see that there seems to be an inverse relation between the *Exchange rate variation* and the *GDP*, since these 2 variables tend to cross with each other over the years.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, out.height="40%"}
+df %>%
+  select(
+    Year,
+    `Exports of goods and services (annual % growth)`, 
+    `Imports of goods and services (annual % growth)`, 
+     `Exchange rate variation (annual % from period average)`) %>%
+  gather("Indicator","Value",2:4) %>% 
+  ggplot(aes(x = Year, y = Value, color = Indicator))+
+  geom_line()+
+  scale_x_continuous(breaks = seq(1960,2021,5))+
+  labs(title = "Figure 2: Exchange rate variation, Exports and Imports (annual %)")+
+  ylab(label = "Annual %")+
+  theme(legend.position = "bottom")+
+  guides(color = guide_legend(nrow = 3, byrow = T))
+```
+
+Source: Own computations based on data from The World Bank DataBank
+<br> </br>
+\hfill\break
+\hfill\break
+\hfill\break
+In this case we can see that the *Imports* and *Exports* trends tend to follow each other over the years.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, out.height="40%"}
+df %>%
+  select(
+    Year,
+    `Exports of goods and services (annual % growth)`, 
+    `Imports of goods and services (annual % growth)`, 
+    `GDP (annual % growth)`) %>%
+  gather("Indicator","Value",2:4) %>% 
+  ggplot(aes(x = Year, y = Value, color = Indicator))+
+  geom_line()+
+  scale_x_continuous(breaks = seq(1960,2021,5))+
+  labs(title = "Figure 3: GDP growth, Exports and Imports (annual %)")+
+  ylab(label = "Annual %")+
+  theme(legend.position = "bottom")+
+  guides(color = guide_legend(nrow = 3, byrow = T))
+```
+
+Source: Own computations based on data from The World Bank DataBank
+<br> </br>
+\hfill\break
+\hfill\break
+In this last plot we can see that, for a great portion of the registered years, the *Exports*, *Imports* and the *GDP* trends tend to follow similar patterns.
+
+\pagebreak
+
+# 6. Data Analysis for model construction
+
+## 6.1. Trends identification
+
+### Figure 4: Scatter plots pairs and Correlation Matrix
+
+```{r,echo=FALSE, message=FALSE, warning=FALSE}
+df %>% 
+  mutate(
+    Exchange = `Exchange rate variation (annual % from period average)`,
+    Exports = `Exports of goods and services (annual % growth)`,
+    Imports = `Imports of goods and services (annual % growth)`,
+    GDP = `GDP (annual % growth)`,
+    Inflation = `Inflation, consumer prices (annual %)`) %>%
+  select(
+    Exchange, 
+    Exports, 
+    Imports, 
+    GDP, 
+    Inflation) %>% 
+  ggpairs(title = "")
+
+```
+
+Source: Own computations based on data from The World Bank DataBank
+<br> </br>
+\hfill\break
+\hfill\break
+\hfill\break
+From the scatter plots grid and correlation matrix we can see that there seems to be a trend between the pair variables:
+
+-   **Exchange rate variation (annual % from period average) / GDP (annual % growth)**
+-   Exports of goods and services (annual % growth) / Imports of goods and services (annual % growth)
+-   **Imports of goods and services (annual % growth) / GDP (annual % growth)**
+-   **Inflation, consumer prices (annual %) / GDP (annual % growth)**
+
+We can see that the highest correlations are present between the pairs Exchange-GDP, Exports-Imports, Imports-GDP and Inflation-GDP. We desire to test the effects of the *Exchange rate* on the Canadian economy, in this case represented with the GDP as a proxy of it. We can include the *Imports* and the *Inflation* indicators to our model to try and better explain the variability on it, so we can see the possible relations between *GDP* and *Exchange rate, Inflation, Imports*:
+
+$$
+GDP = \beta_0 + \beta_1 ExchangeRate + \beta_2 Imports + \beta_3 Inflation + e_i 
+$$
+
+*GDP* is the Gross Domestic Product annual % growth in Canada
+*ExchangeRate* is the annual % variation of Exchange rate from period average in Canada
+*Imports* is the annual % growth of Imports of goods and services in Canada
+*Inflation* is the annual % Inflation measured by consumer prices
+
+\pagebreak
+
+## 6.2. Model Building and Diagnosis
+
+### Table 2: Initial Model Summary
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+model_1 <- lm(`GDP (annual % growth)` ~ `Exchange rate variation (annual % from period average)` + `Inflation, consumer prices (annual %)` + `Imports of goods and services (annual % growth)`, data = df)
+
+
+jtools::summ(model_1)
+```
+
+Source: Own computations based on data from The World Bank DataBank 
+<br> </br>
+\hfill\break
+\hfill\break
+\hfill\break
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+modeltest_1 <- coeftest(model_1, sandwich)
+
+modeltest_1
+```
+
+Source: Own computations based on data from The World Bank DataBank 
+<br> </br>
+\hfill\break
+\hfill\break
+\hfill\break
+Our model seems to capture most of the variability of our dependent variable *GDP*, showing an R-square and an Adjusted R-square of 0.91. In addition, our 3 independent variables and the intercept seems to be highly significant to our model, each with a p-value \< 0,05 (related to their own t-statistics), suggesting that our model may have a highly predictive power. Now we want to assess the robustness of our model so we'll start studying the errors for abnormalities.
+
+### Figure 5: Normality of errors (Q-Q Plot)
+
+```{r, echo=FALSE,message=FALSE, warning=FALSE, out.height="40%"}
+qqnorm(rstandard(model_1), main = "" )
+qqline(rstandard(model_1))
+```
+
+Source: Own computations based on data from The World Bank DataBank 
+<br> </br>
+\hfill\break
+\hfill\break
+\hfill\break
+As the errors seems to be pretty well fitted to our line, we may say that they meet the normality assumption. We'll also check that the errors have median 0 and that they are symmetrically distributed.
+
+### Figure 6: Errors Centrality and Symmetry
+
+```{r,echo=FALSE, message=FALSE, warning=FALSE, out.height="40%"}
+boxplot(rstandard(model_1))
+```
+
+Source: Own computations based on data from The World Bank DataBank 
+<br> </br>
+\hfill\break
+\hfill\break
+\hfill\break
+We see that, for the most of our errors, they meet our assumptions, with the exception of 3 outliers. Now let's check for homogeneity of variances (or homoscedasticity).
+
+### Figure 7: Homoscedasticity
+
+```{r,echo=FALSE, message=FALSE, warning=FALSE, out.height="40%"}
+plot(fitted.values(model_1), rstandard(model_1), main = "", xlab = "Fitted values", ylab = "Standardized Errors")
+  
+```
+
+Source: Own computations based on data from The World Bank DataBank
+<br> </br>
+\hfill\break
+\hfill\break
+\hfill\break
+We see that, even when the errors are a little skewed to the right, they still seems to be randomly spread, so we can expect the same variance in general. Now we proceed to assess the independence of the errors from our variables.
+
+### Independency of Errors
+
+### Figure 8: Independence of errors from "Exchange rate"
+
+```{r,echo=FALSE, message=FALSE, warning=FALSE, out.height="40%"}
+dummy <- df[3:62,]
+
+plot(dummy$`Exchange rate variation (annual % from period average)`,rstandard(model_1),  main = "", xlab = "Fitted Values", ylab = "Standardized Errors")
+
+```
+
+Source: Own computations based on data from The World Bank DataBank 
+<br> </br>
+### Figure 9: Independency of errors from "Inflation"
+
+```{r,echo=FALSE, message=FALSE, warning=FALSE, out.height="40%"}
+plot(dummy$`Inflation, consumer prices (annual %)`, rstandard(model_1),  main = "", xlab = "Fitted Values", ylab = "Standardized Errors")
+
+```
+
+Source: Own computations based on data from The World Bank DataBank 
+<br> </br>
+### Figure 10: Independency of errors from "Imports"
+
+```{r,echo=FALSE, message=FALSE, warning=FALSE, out.height="40%"}
+
+plot(dummy$`Imports of goods and services (annual % growth)`,rstandard(model_1),  main = "", xlab = "Fitted Values", ylab = "Standardized Errors")
+
+```
+
+Source: Own computations based on data from The World Bank DataBank 
+<br> </br>
+\hfill\break
+\hfill\break
+\hfill\break
+As we can see, in general the errors seem to be independent from our variables.
+
+\pagebreak
+
+# 7. Conclusion of the statistical model
+
+In general we found that our model seems to capture most of the variability of our dependent variable *GDP*. With an R-square and an Adjusted R-square of 0.91, and with our 3 independent variables and the intercept each with a p-value \< 0.05, we can expect our model to have a highly predictive power. Not only this, the general visual analysis of the errors and its relations to the independent variables suggest that our model may have a high robustness.
+
+# 8. Conclusion
+
+We were able to obtain and clean the data sets from The World Bank website related to the Canadian Economy, more specific, the collected data on *Imports of goods and services*, *Exports of goods and services*, *Official exchange rate*, *Inflation related to consumer prices* and the *GDP*. In relation to this, we had to build two extra variables, *GDP annual growth* and *Exchange rate variation*, from the original data since these indicators had too many missing values in The World Bank data sets or weren't available. We were able to visualize the patterns shown between some of the chosen indicators using some of the CRAN project data visualization tools. In addition, we were able to assess the correlation level between some of our indicators and the *GDP growth*, helping us to propose a possible model. After this, we generated such model by means of the CRAN project tools and proceeded to test its predictive power and robustness using different general hypothesis related to the errors and the predictors, obtaining results that suggests that this model may be able to predict the *GDP growth* given the required data. Finally, this suggests that the *Exchange rate*, in addition to the *Imports* and the *Inflation*, have an important effect over the Canadian *GDP growth*, so we could expect such factors to also have an important effect over the Canadian Economy health and evolution.
+
+\pagebreak
+
+# 9. References
+
+Callen, T. (2020). Gross Domestic Product: An Economy's All. Retrieved 4 July 2022, from <https://www.imf.org/external/pubs/ft/fandd/basics/gdp.htm>
+
+Exports of goods and services (annual % growth) - Canada \| Data. (2022). Retrieved 4 July 2022, from <https://data.worldbank.org/indicator/NE.EXP.GNFS.KD.ZG?locations=CA>
+
+GDP (current US\$) - Canada \| Data. (2022). Retrieved 4 July 2022, from <https://data.worldbank.org/indicator/NY.GDP.MKTP.CD?locations=CA>
+
+Imports of goods and services (annual % growth) - Canada \| Data. (2022). Retrieved 4 July 2022, from <https://data.worldbank.org/indicator/NE.IMP.GNFS.KD.ZG?locations=CA>
+
+Inflation, consumer prices (annual %) - Canada \| Data. (2022). Retrieved 4 July 2022, from <https://data.worldbank.org/indicator/FP.CPI.TOTL.ZG?locations=CA>
+
+Official exchange rate (LCU per US\$, period average) - Canada \| Data. (2022). Retrieved 4 July 2022, from <https://data.worldbank.org/indicator/PA.NUS.FCRF?locations=CA>
+
+Understanding exchange rates. (2020). Retrieved 4 July 2022, from <https://www.bankofcanada.ca/2020/08/understanding-exchange-rates/>
+
+\pagebreak
+
+# 10. Appendix
+
+```{r,echo=FALSE, message=FALSE, warning=FALSE}
+df %>% gather("Indicator","Value",2:8) %>% 
+  kable(booktabs = TRUE, longtable = TRUE, caption = "Data Set - Long") %>%
+  kable_styling(latex_options = c("hold_position", "repeat_header"))
+```
